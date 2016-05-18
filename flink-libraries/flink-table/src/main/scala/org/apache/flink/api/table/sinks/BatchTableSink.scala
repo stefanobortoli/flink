@@ -15,9 +15,17 @@
  * See the License for the specific language governing permissions and
  * limitations under the License.
  */
-package org.apache.flink.api.table
 
-/**
- * General Exception for all errors during table handling.
- */
-class TableException(msg: String) extends RuntimeException(msg)
+package org.apache.flink.api.table.sinks
+
+import org.apache.flink.api.java.DataSet
+
+/** Defines an external [[TableSink]] to emit a batch [[org.apache.flink.api.table.Table]].
+  *
+  * @tparam T Type of [[DataSet]] that this [[TableSink]] expects and supports.
+  */
+trait BatchTableSink[T] extends TableSink[T] {
+
+  /** Emits the DataSet. */
+  def emitDataSet(dataSet: DataSet[T]): Unit
+}
