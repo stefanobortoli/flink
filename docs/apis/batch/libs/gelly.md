@@ -121,6 +121,9 @@ val weight = e.getValue // weight = 0.5
 </div>
 </div>
 
+In Gelly an `Edge` is always directed from the source vertex to the target vertex. A `Graph` may be undirected if for
+every `Edge` it contains a matching `Edge` from the target vertex to the source vertex.
+
 {% top %}
 
 Graph Creation
@@ -1828,6 +1831,7 @@ Gelly has a growing collection of graph algorithms for easily analyzing large-sc
 * [GSA Triangle Count](#gsa-triangle-count)
 * [Triangle Enumerator](#triangle-enumerator)
 * [Summarization](#summarization)
+* [Local Clustering Coefficient](#local-clustering-coefficient)
 
 Gelly's library methods can be used by simply calling the `run()` method on the input graph:
 
@@ -1953,7 +1957,7 @@ PageRank is an algorithm that was first used to rank web search engine results. 
 
 #### Details
 The algorithm operates in iterations, where pages distribute their scores to their neighbors (pages they have links to) and subsequently update their scores based on the partial values they receive. The implementation assumes that each page has at least one incoming and one outgoing link.
-In order to consider the importance of a link from one page to another, scores are divided by the total number of out-links of the source page. Thus, a page with 10 links will distribute 1/10 of its score to each neighbor, while a page with 100 links, will distribute 1/100 of its score to each neighboring page. This process computes what is often called the transition probablities, i.e. the probability that some page will lead to other page while surfing the web. To correctly compute the transition probabilities, this implementation expectes the edge values to be initialiez to 1.0.
+In order to consider the importance of a link from one page to another, scores are divided by the total number of out-links of the source page. Thus, a page with 10 links will distribute 1/10 of its score to each neighbor, while a page with 100 links, will distribute 1/100 of its score to each neighboring page. This process computes what is often called the transition probablities, i.e. the probability that some page will lead to other page while surfing the web. To correctly compute the transition probabilities, this implementation expects the edge values to be initialised to 1.0.
 
 #### Usage
 The algorithm takes as input a `Graph` with any vertex type, `Double` vertex values, and `Double` edge values. Edges values should be initialized to 1.0, in order to correctly compute the transition probabilities. Otherwise, the transition probability for an Edge `(u, v)` will be set to the edge value divided by `u`'s out-degree. The algorithm returns a `DataSet` of vertices, where the vertex value corresponds to assigned rank after convergence (or maximum iterations).
@@ -2047,6 +2051,23 @@ The algorithm takes a directed, vertex (and possibly edge) attributed graph as i
 vertex represents a group of vertices and each edge represents a group of edges from the input graph. Furthermore, each
 vertex and edge in the output graph stores the common group value and the number of represented elements.
 
+### Local Clustering Coefficient
+
+#### Overview
+The local clustering coefficient measures the connectedness of each vertex's neighborhood. Scores range from 0.0 (no
+edges between neighbors) to 1.0 (neighborhood is a clique).
+
+#### Details
+An edge between a vertex's neighbors is a triangle. Counting edges between neighbors is equivalent to counting the
+number of triangles which include the vertex. The clustering coefficient score is the number of edges between neighbors
+divided by the number of potential edges between neighbors.
+
+See the [Triangle Enumeration](#triangle-enumeration) library method for a detailed explanation of triangle enumeration.
+
+#### Usage
+The algorithm takes a simple, undirected graph as input and outputs a `DataSet` of tuples containing the vertex ID,
+vertex degree, and number of triangles containing the vertex. The vertex ID must be `Comparable` and `Copyable`.
+
 {% top %}
 
 Graph Algorithms
@@ -2067,9 +2088,130 @@ configuration.
 
   <tbody>
     <tr>
-      <td><strong>TranslateGraphIds</strong></td>
+      <td>degree.annotate.directed.<br/><strong>VertexInDegree</strong></td>
       <td>
-        <p>Translate vertex and edge IDs using the given <code>MapFunction</code>.</p>
+        <p>Annotate vertices of a <a href="#graph-representation">directed graph</a> with the in-degree.</p>
+{% highlight java %}
+DataSet<Vertex<K, LongValue>> inDegree = graph
+  .run(new VertexInDegree()
+    .setIncludeZeroDegreeVertices(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setIncludeZeroDegreeVertices</strong>: by default only the edge set is processed for the computation of degree; when this flag is set an additional join is performed against the vertex set in order to output vertices with an in-degree of zero</p></li>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>degree.annotate.directed.<br/><strong>VertexOutDegree</strong></td>
+      <td>
+        <p>Annotate vertices of a <a href="#graph-representation">directed graph</a> with the out-degree.</p>
+{% highlight java %}
+DataSet<Vertex<K, LongValue>> outDegree = graph
+  .run(new VertexOutDegree()
+    .setIncludeZeroDegreeVertices(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setIncludeZeroDegreeVertices</strong>: by default only the edge set is processed for the computation of degree; when this flag is set an additional join is performed against the vertex set in order to output vertices with an out-degree of zero</p></li>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>degree.annotate.directed.<br/><strong>VertexDegreePair</strong></td>
+      <td>
+        <p>Annotate vertices of a <a href="#graph-representation">directed graph</a> with both the out-degree and in-degree.</p>
+{% highlight java %}
+DataSet<Vertex<K, Tuple2<LongValue, LongValue>>> pairDegree = graph
+  .run(new VertexDegreePair()
+    .setIncludeZeroDegreeVertices(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setIncludeZeroDegreeVertices</strong>: by default only the edge set is processed for the computation of degree; when this flag is set an additional join is performed against the vertex set in order to output vertices with out- and in-degree of zero</p></li>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>degree.annotate.undirected.<br/><strong>VertexDegree</strong></td>
+      <td>
+        <p>Annotate vertices of an <a href="#graph-representation">undirected graph</a> with the degree.</p>
+{% highlight java %}
+DataSet<Vertex<K, LongValue>> degree = graph
+  .run(new VertexDegree()
+    .setIncludeZeroDegreeVertices(true)
+    .setReduceOnTargetId(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setIncludeZeroDegreeVertices</strong>: by default only the edge set is processed for the computation of degree; when this flag is set an additional join is performed against the vertex set in order to output vertices with a degree of zero</p></li>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+          <li><p><strong>setReduceOnTargetId</strong>: the degree can be counted from either the edge source or target IDs. By default the source IDs are counted. Reducing on target IDs may optimize the algorithm if the input edge list is sorted by target ID.</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>degree.annotate.undirected.<br/><strong>EdgeSourceDegree</strong></td>
+      <td>
+        <p>Annotate edges of an <a href="#graph-representation">undirected graph</a> with degree of the source ID.</p>
+{% highlight java %}
+DataSet<Edge<K, Tuple2<EV, LongValue>>> sourceDegree = graph
+  .run(new EdgeSourceDegree()
+    .setReduceOnTargetId(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+          <li><p><strong>setReduceOnTargetId</strong>: the degree can be counted from either the edge source or target IDs. By default the source IDs are counted. Reducing on target IDs may optimize the algorithm if the input edge list is sorted by target ID.</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>degree.annotate.undirected.<br/><strong>EdgeTargetDegree</strong></td>
+      <td>
+        <p>Annotate edges of an <a href="#graph-representation">undirected graph</a> with degree of the target ID.</p>
+{% highlight java %}
+DataSet<Edge<K, Tuple2<EV, LongValue>>> targetDegree = graph
+  .run(new EdgeTargetDegree()
+    .setReduceOnSourceId(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+          <li><p><strong>setReduceOnSourceId</strong>: the degree can be counted from either the edge source or target IDs. By default the target IDs are counted. Reducing on source IDs may optimize the algorithm if the input edge list is sorted by source ID.</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>degree.annotate.undirected.<br/><strong>EdgeDegreePair</strong></td>
+      <td>
+        <p>Annotate edges of an <a href="#graph-representation">undirected graph</a> with the degree of both the source and target degree ID.</p>
+{% highlight java %}
+DataSet<Edge<K, Tuple3<EV, LongValue, LongValue>>> pairDegree = graph
+  .run(new EdgeDegreePair()
+    .setReduceOnTargetId(true));
+{% endhighlight %}
+        <p>Optional configuration:</p>
+        <ul>
+          <li><p><strong>setParallelism</strong>: override the operator parallelism</p></li>
+          <li><p><strong>setReduceOnTargetId</strong>: the degree can be counted from either the edge source or target IDs. By default the source IDs are counted. Reducing on target IDs may optimize the algorithm if the input edge list is sorted by target ID.</p></li>
+        </ul>
+      </td>
+    </tr>
+
+    <tr>
+      <td>translate.<br/><strong>TranslateGraphIds</strong></td>
+      <td>
+        <p>Translate vertex and edge IDs using the given <code>TranslateFunction</code>.</p>
 {% highlight java %}
 graph.run(new TranslateGraphIds(new LongValueToStringValue()));
 {% endhighlight %}
@@ -2077,9 +2219,9 @@ graph.run(new TranslateGraphIds(new LongValueToStringValue()));
     </tr>
 
     <tr>
-      <td><strong>TranslateVertexValues</strong></td>
+      <td>translate.<br/><strong>TranslateVertexValues</strong></td>
       <td>
-        <p>Translate vertex values using the given <code>MapFunction</code>.</p>
+        <p>Translate vertex values using the given <code>TranslateFunction</code>.</p>
 {% highlight java %}
 graph.run(new TranslateVertexValues(new LongValueAddOffset(vertexCount)));
 {% endhighlight %}
@@ -2087,9 +2229,9 @@ graph.run(new TranslateVertexValues(new LongValueAddOffset(vertexCount)));
     </tr>
 
     <tr>
-      <td><strong>TranslateEdgeValues</strong></td>
+      <td>translate.<br/><strong>TranslateEdgeValues</strong></td>
       <td>
-        <p>Translate edge values using the given <code>MapFunction</code>.</p>
+        <p>Translate edge values using the given <code>TranslateFunction</code>.</p>
 {% highlight java %}
 graph.run(new TranslateEdgeValues(new Nullify()));
 {% endhighlight %}
@@ -2537,7 +2679,7 @@ A directed or undirected power-law graph generated using the
 [Recursive Matrix (R-Mat)](http://www.cs.cmu.edu/~christos/PUBLICATIONS/siam04.pdf) model.
 
 RMat is a stochastic generator configured with a source of randomness implementing the
-`RandomGenerableFactory` interface. Provided implemenations are `JDKRandomGeneratorFactory`
+`RandomGenerableFactory` interface. Provided implementations are `JDKRandomGeneratorFactory`
 and `MersenneTwisterFactory`. These generate an initial sequence of random values which are
 then used as seeds for generating the edges.
 
